@@ -1,0 +1,123 @@
+<script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+<style>
+  canvas{ border: 1px solid black; }
+  body{filter: invert(100%);}
+</style>
+<script>
+  var socket = io();
+
+  var userid;
+  var loggedIn = false;
+
+  function login(username){
+    socket.emit("login",{
+      username: username
+    });
+    removeElement("loginForm");
+  }
+
+  socket.on("loginCallback", function (id){
+    userid = id;
+    loggedIn = true;
+  });
+
+  function removeElement(elementId) {
+    // Removes an element from the document.
+    var element = document. getElementById(elementId);
+    element. parentNode. removeChild(element);
+  }
+
+
+
+</script>
+<body bgcolor="black">
+
+  <div id="ping">Ping:</div>
+
+  <div id="loginForm">
+    <input type="text" id="usernameInput" value="username">
+    <button onclick="login(document.getElementById('usernameInput').value)">LOGIN</button><br>
+  </div>
+
+  <canvas id="frame" width="500" height="500"></canvas>
+
+  <h2 id="score"></h2>
+</body>
+<script>
+
+  var cPos = {};
+
+  var c = document.getElementById("frame");
+  var ctx = c.getContext("2d");
+  var w = c.width;
+  var radius = w/20;
+  /*ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, c.width, c.height);
+  c.style.opacity = '0.2';*/
+
+  document.getElementById("usernameInput").addEventListener("keyup", function(event) {
+    if(event == 13){
+      login(document.getElementById('usernameInput').value);
+    }
+  });
+
+  function hitCircle(x,y){
+    if(Math.sqrt((cPos.x-x)*(cPos.x-x)+(cPos.y-y)*(cPos.y-y))<=radius){
+      return true;
+    }
+    return false;
+  }
+
+  function getCursorPosition(canvas, event) {
+    const rect = canvas.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+    if(hitCircle(x,y)){
+      socket.emit("hit", {
+        id: userid
+      });
+      clearCanvas();
+    }
+  }
+
+  socket.on("sendScore",function (data){
+    if(loggedIn){
+      document.getElementById("score").innerHTML += data.username + ": " + data.time + "ms<br>";
+    }
+  });
+
+
+  function clearCanvas() {
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, c.width, c.height);
+  }
+
+  const canvas = document.querySelector('canvas')
+  canvas.addEventListener('mousedown', function(e) {
+      getCursorPosition(canvas, e);
+  });
+
+  function drawCircle(pos){
+    ctx.beginPath();
+    ctx.lineWidth = "5";
+    ctx.arc(cPos.x, cPos.y, radius, 0, 2 * Math.PI);
+    ctx.stroke();
+  }
+
+
+
+  socket.on("sendPos", function (pos){
+    socket.emit("returnPong", {});
+    cPos.x = pos.x*w*(9/10)+radius;
+    cPos.y = pos.y*w*(9/10)+radius;
+    drawCircle(pos);
+    document.getElementById("score").innerHTML = "";
+    setTimeout(clearCanvas, 1000);
+  });
+
+  socket.on("sendPing", function (data){
+    console.log(data);
+    document.getElementById("ping").innerHTML = "Ping: " + data.ping + " ms";
+  });
+
+</script>
